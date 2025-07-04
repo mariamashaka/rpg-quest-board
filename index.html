@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG Quest Board - Мария</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-pattern"></div>
+    
+    <div class="container">
+        <div class="header">
+            <h1>⚔️ Доска Квестов ⚔️</h1>
+            <p style="font-size: 1.2em; color: #cdaa3d;">Лекарь-наставник Мария</p>
+            
+            <div class="level-info">
+                <div class="main-level">
+                    <span class="level-number" id="main-level">1</span>
+                    <span class="level-label">Уровень</span>
+                </div>
+                
+                <div class="xp-bar">
+                    <div class="xp-bar-container">
+                        <div class="xp-bar-fill" id="xp-bar-fill" style="width: 0%"></div>
+                        <div class="xp-bar-text" id="xp-bar-text">0 / 100 XP</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center;">
+                    <div style="color: #ffd700; font-size: 1.1em; font-weight: bold;" id="total-xp">0 XP</div>
+                    <div style="color: #cdaa3d; font-size: 0.8em;">Общий опыт</div>
+                </div>
+            </div>
+            
+            <div class="category-levels">
+                <div class="category-level">
+                    <span class="cat-name">🩺 Медицина</span>
+                    <span class="cat-level" id="medical-level">1</span>
+                </div>
+                <div class="category-level">
+                    <span class="cat-name">🔬 Наука</span>
+                    <span class="cat-level" id="science-level">1</span>
+                </div>
+                <div class="category-level">
+                    <span class="cat-name">🌍 Языки</span>
+                    <span class="cat-level" id="languages-level">1</span>
+                </div>
+                <div class="category-level">
+                    <span class="cat-name">🏛️ Менеджмент</span>
+                    <span class="cat-level" id="management-level">1</span>
+                </div>
+                <div class="category-level">
+                    <span class="cat-name">👨‍👩‍👧 Семья</span>
+                    <span class="cat-level" id="family-level">1</span>
+                </div>
+                <div class="category-level">
+                    <span class="cat-name">✨ Я сама</span>
+                    <span class="cat-level" id="self-level">1</span>
+                </div>
+            </div>
+            
+            <div class="character-stats">
+                <div class="stat" title="Физическая энергия. Влияет на продуктивность и мотивацию. Зависит от сна, еды и активности.">
+                    <div class="stat-name">💪 Энергия</div>
+                    <div class="stat-bar">
+                        <div class="stat-fill" id="energy-fill" style="width: 70%"></div>
+                        <div class="stat-value" id="energy-value">70</div>
+                    </div>
+                </div>
+                <div class="stat" title="Ментальная концентрация. Помогает сосредоточиться на сложных задачах. Восстанавливается отдыхом и здоровым питанием.">
+                    <div class="stat-name">🎯 Фокус</div>
+                    <div class="stat-bar">
+                        <div class="stat-fill" id="focus-fill" style="width: 65%"></div>
+                        <div class="stat-value" id="focus-value">65</div>
+                    </div>
+                </div>
+                <div class="stat" title="Общее физическое состояние. Основа для всех других характеристик. Поддерживается правильным питанием, сном и активностью.">
+                    <div class="stat-name">❤️ Здоровье</div>
+                    <div class="stat-bar">
+                        <div class="stat-fill" id="health-fill" style="width: 80%"></div>
+                        <div class="stat-value" id="health-value">80</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="quest-section">
+                <div class="quest-header">
+                    <h2>📜 Активные Квесты</h2>
+                    <button class="btn" onclick="showAddQuestModal()">+ Новый Квест</button>
+                </div>
+                
+                <div class="quest-filters">
+                    <button class="filter-btn active" onclick="filterQuests('all')">Все</button>
+                    <button class="filter-btn" onclick="filterQuests('medical')">🩺 Медицина</button>
+                    <button class="filter-btn" onclick="filterQuests('science')">🔬 Наука</button>
+                    <button class="filter-btn" onclick="filterQuests('languages')">🌍 Языки</button>
+                    <button class="filter-btn" onclick="filterQuests('management')">🏛️ Менеджмент</button>
+                    <button class="filter-btn" onclick="filterQuests('family')">👨‍👩‍👧 Семья</button>
+                    <button class="filter-btn" onclick="filterQuests('self')">✨ Я сама</button>
+                </div>
+                
+                <div class="quest-grid" id="quest-grid">
+                    <!-- Квесты будут добавлены через JavaScript -->
+                </div>
+            </div>
+            
+            <div>
+                <div class="daily-routine" style="margin-bottom: 20px;">
+                    <h2>💪 Здоровье</h2>
+                    
+                    <div class="routine-item">
+                        <label>
+                            <input type="checkbox" id="food-check"> 🍽️ Еда (3 раза)
+                        </label>
+                    </div>
+                    
+                    <div class="routine-item">
+                        <label>
+                            <input type="checkbox" id="healthy-food-check"> 🥗 Здоровое питание
+                        </label>
+                    </div>
+                    
+                    <div class="routine-item">
+                        <label>
+                            <input type="checkbox" id="pleasure-food-check"> 🍰 Питание в удовольствие
+                        </label>
+                    </div>
+                    
+                    <div class="routine-item">
+                        <label>
+                            <input type="checkbox" id="exercise-check"> 🏃‍♀️ Физическая активность
+                        </label>
+                    </div>
+                    
+                    <div class="routine-item">
+                        <label>
+                            <input type="checkbox" id="sleep-check"> 😴 Достаточный сон (≥7ч)
+                        </label>
+                    </div>
+                    
+                    <div class="routine-item">
+                        <label style="flex: 1;">
+                            💧 Питьё (<span id="water-display">0</span>/2000 мл)
+                        </label>
+                        <input type="range" id="water-slider" min="0" max="2000" value="0" step="100">
+                    </div>
+                </div>
+                
+                <div class="daily-routine">
+                    <h2>📋 Ежедневная Рутина</h2>
+                    
+                    <div class="routine-item">
+                        <label>
+                            <input type="checkbox" id="nesuda1-check"> 🎯 <span id="nesuda1-text">Написать смены спецов</span>
+                        </label>
+                        <button class="btn btn-small" onclick="editRoutineTask('nesuda1')" style="margin-left: 10px;">✏️</button>
+                    </div>
+                    
+                    <div class="routine-item">
+                        <label>
+                            <input type="checkbox" id="nesuda2-check"> 🎯 <span id="nesuda2-text">Проверить отчеты</span>
+                        </label>
+                        <button class="btn btn-small" onclick="editRoutineTask('nesuda2')" style="margin-left: 10px;">✏️</button>
+                    </div>
+                    
+                    <div class="routine-item">
+                        <label>
+                            <input type="checkbox" id="nesuda3-check"> 🎯 <span id="nesuda3-text">Планирование недели</span>
+                        </label>
+                        <button class="btn btn-small" onclick="editRoutineTask('nesuda3')" style="margin-left: 10px;">✏️</button>
+                    </div>
+                    
+                    <div class="routine-item">
+                        <label>
+                            <input type="checkbox" id="home-check"> 🏠 <span id="home-text">Разобрать почту</span>
+                        </label>
+                        <button class="btn btn-small" onclick="editRoutineTask('home')" style="margin-left: 10px;">✏️</button>
+                    </div>
+                    
+                    <div class="routine-item">
+                        <label>
+                            <input type="checkbox" id="family-check"> 👨‍👩‍👧 <span id="family-text">Позвонить родителям</span>
+                        </label>
+                        <button class="btn btn-small" onclick="editRoutineTask('family')" style="margin-left: 10px;">✏️</button>
+                    </div>
+                    
+                    <div class="routine-bonus">
+                        <div class="multiplier-display" id="multiplier-display">Множитель опыта: ×1.0</div>
+                        <p style="margin-top: 10px; font-size: 0.9em; color: #cdaa3d;">
+                            Рутина ≥50% → +30% опыта к квестам!
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="quest-generator">
+            <h3>🎯 Генератор Квестов</h3>
+            <p style="text-align: center; margin-bottom: 15px; color: #cdaa3d;">
+                Расскажи, что происходит в твоей жизни, и получи квест-задание!
+            </p>
+            
+            <textarea class="generator-input" id="situation-input" 
+                placeholder="Например: 'Ко мне стали приходить дети с ДЦП, и мне нужно освоить эрготерапию. Начала изучать методики...'"></textarea>
+            
+            <div style="text-align: center;">
+                <button class="btn" onclick="generateQuest()">🎲 Создать Квест</button>
+            </div>
+            
+            <div class="level-indicators">
+                <div class="level-indicator level-E">E - Простые задачи</div>
+                <div class="level-indicator level-D">D - Небольшие проекты</div>
+                <div class="level-indicator level-C">C - Средние цели</div>
+                <div class="level-indicator level-B">B - Важные миссии</div>
+                <div class="level-indicator level-A">A - Системные изменения</div>
+                <div class="level-indicator level-S">S - Легендарные достижения</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для добавления квеста -->
+    <div id="addQuestModal" class="modal">
+        <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+            <span class="close" onclick="closeAddQuestModal()">&times;</span>
+            <h3>📝 Новый Квест</h3>
+            
+            <div class="form-group">
+                <label>Название квеста:</label>
+                <input type="text" id="quest-title" placeholder="Например: Освоение эрготерапии">
+            </div>
+            
+            <div class="form-group">
+                <label>Категория:</label>
+                <select id="quest-category">
+                    <option value="medical">🩺 Медицинские знания</option>
+                    <option value="science">🔬 Наука</option>
+                    <option value="languages">🌍 Языки</option>
+                    <option value="management">🏛️ Менеджмент</option>
+                    <option value="family">👨‍👩‍👧 Семья</option>
+                    <option value="self">✨ Я сама</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Уровень сложности:</label>
+                <select id="quest-level">
+                    <option value="E">E - Простая задача</option>
+                    <option value="D">D - Небольшой проект</option>
+                    <option value="C">C - Средняя цель</option>
+                    <option value="B">B - Важная миссия</option>
+                    <option value="A">A - Системное изменение</option>
+                    <option value="S">S - Легендарное достижение</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Описание:</label>
+                <textarea id="quest-description" placeholder="Подробности квеста..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>📊 Способ измерения прогресса:</label>
+                <select id="progress-type" onchange="toggleProgressOptions()">
+                    <option value="simple">🎯 Простой (кнопки +10%, +25%)</option>
+                    <option value="steps">📈 По шагам (от X до Y)</option>
+                    <option value="stages">📋 По этапам (подзадачи)</option>
+                </select>
+            </div>
+            
+            <!-- Опции для "По шагам" -->
+            <div id="steps-options" style="display: none;">
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>От (текущее значение):</label>
+                        <input type="number" id="steps-from" placeholder="10">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>До (целевое значение):</label>
+                        <input type="number" id="steps-to" placeholder="60">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Единица измерения:</label>
+                    <input type="text" id="steps-unit" placeholder="уровень, балл, страница...">
+                </div>
+            </div>
+            
+            <!-- Опции для "По этапам" -->
+            <div id="stages-options" style="display: none;">
+                <div class="form-group">
+                    <label>Этапы квеста:</label>
+                    <div id="stages-list">
+                        <div class="stage-item" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                            <input type="text" placeholder="Название этапа..." style="flex: 1; padding: 8px; border: 1px solid #d4af37; border-radius: 5px; background: rgba(0,0,0,0.3); color: #d4af37;">
+                            <input type="number" placeholder="%" min="1" max="100" style="width: 60px; padding: 8px; border: 1px solid #d4af37; border-radius: 5px; background: rgba(0,0,0,0.3); color: #d4af37;">
+                            <button type="button" onclick="removeStage(this)" style="background: #c44; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer;">×</button>
+                        </div>
+                    </div>
+                    <button type="button" onclick="addStage()" class="btn" style="margin-top: 10px;">+ Добавить этап</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>⏰ Дедлайн (необязательно):</label>
+                <input type="date" id="quest-deadline" style="width: 100%; padding: 10px; border: 1px solid #d4af37; border-radius: 8px; background: rgba(0,0,0,0.3); color: #d4af37;">
+            </div>
+            
+            <div class="form-group">
+                <label>📈 Уже выполнено (%):</label>
+                <input type="number" id="initial-progress" min="0" max="99" value="0" placeholder="0">
+            </div>
+            
+            <div class="form-buttons">
+                <button class="btn" onclick="addQuest()">Создать Квест</button>
+                <button class="btn" onclick="closeAddQuestModal()" style="background: #666;">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
