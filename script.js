@@ -120,15 +120,15 @@ function loadGameData() {
 // Система опыта
 function calculateQuestXP(level, progress = 100) {
     const baseXP = {
-        'E': 10,
-        'D': 25,
-        'C': 50,
-        'B': 100,
-        'A': 200,
-        'S': 500
+        'E': 25,    // Простые задачи, 1-2 дня
+        'D': 75,    // Небольшие проекты, неделя  
+        'C': 200,   // Средние цели, месяц
+        'B': 500,   // Важные миссии, 2-3 месяца
+        'A': 1000,  // Системные изменения, полгода
+        'S': 2500   // Легендарные достижения, год+
     };
     
-    return Math.round((baseXP[level] || 25) * (progress / 100));
+    return Math.round((baseXP[level] || 75) * (progress / 100));
 }
 
 function addExperience(category, xp) {
@@ -154,6 +154,15 @@ function addExperience(category, xp) {
     // Обновляем прогресс до следующего уровня
     gameData.experience.currentLevelXP = gameData.experience.totalXP % 100;
     gameData.experience.nextLevelXP = 100;
+
+    // Проверяем награды за новый уровень
+    if (newMainLevel > gameData.experience.level) {
+    gameData.experience.level = newMainLevel;
+    showLevelUpNotification(`🎉 Поздравляем! Вы достигли ${newMainLevel} уровня!`);
+    
+    // Проверяем награды
+    checkLevelRewards(newMainLevel);
+}
     
     updateExperienceDisplay();
     saveGameData();
@@ -247,11 +256,31 @@ function updateHealth() {
 }
 
 function updateHealthFromUI() {
+    const oldHealth = { ...gameData.health }; // Сохраняем старое состояние
+    
     gameData.health.food = document.getElementById('food-check').checked;
     gameData.health.healthyFood = document.getElementById('healthy-food-check').checked;
     gameData.health.pleasureFood = document.getElementById('pleasure-food-check').checked;
     gameData.health.exercise = document.getElementById('exercise-check').checked;
     gameData.health.sleep = document.getElementById('sleep-check').checked;
+    
+    // Проверяем какие пункты здоровья только что выполнены
+    const healthTasks = ['food', 'healthyFood', 'pleasureFood', 'exercise', 'sleep'];
+    const healthNames = {
+        food: '🍽️ Еда',
+        healthyFood: '🥗 Здоровое питание', 
+        pleasureFood: '🍰 Питание в удовольствие',
+        exercise: '🏃‍♀️ Физическая активность',
+        sleep: '😴 Достаточный сон'
+    };
+    
+    healthTasks.forEach(task => {
+        if (!oldHealth[task] && gameData.health[task]) {
+            // Только что выполнено - даем XP
+            addExperience('self', 1);
+            showMiniNotification(`+1 XP за "${healthNames[task]}"`);
+        }
+    });
     
     updateStats();
     updateMultiplier();
@@ -271,10 +300,23 @@ function updateRoutine() {
 }
 
 function updateRoutineFromUI() {
+    const oldRoutine = {};
+    Object.keys(gameData.routine).forEach(key => {
+        oldRoutine[key] = gameData.routine[key].done;
+    });
+    
     Object.keys(gameData.routine).forEach(key => {
         const checkbox = document.getElementById(`${key}-check`);
         if (checkbox) {
-            gameData.routine[key].done = checkbox.checked;
+            const wasCompleted = oldRoutine[key];
+            const isCompleted = checkbox.checked;
+            
+            // Если задача только что выполнена - даем XP
+            if (!wasCompleted && isCompleted) {
+                giveRoutineXP(key);
+            }
+            
+            gameData.routine[key].done = isCompleted;
         }
     });
     
@@ -298,28 +340,51 @@ function updateMultiplier() {
     const health = gameData.health;
     let baseStats = 20; // Базовые 20%
     
-    // Каждый элемент здоровья дает +10%
-    if (health.food) baseStats += 10;
-    if (health.healthyFood) baseStats += 10;
-    if (health.pleasureFood) baseStats += 10;
-    if (health.exercise) baseStats += 10;
-    if (health.sleep) baseStats += 10;
-    if (health.water >= 1500) baseStats += 10; // Достаточно воды
+    // Каждый элемент здоровья дает +12%
+    if (health.food) baseStats += 12;
+    if (health.healthyFood) baseStats += 12;
+    if (health.pleasureFood) baseStats += 12;
+    if (health.exercise) baseStats += 12;
+    if (health.sleep) baseStats += 12;
+    if (health.water >= 1500) baseStats += 12; // Достаточно воды
     
     // Обновляем характеристики
     gameData.stats.health = Math.min(100, baseStats);
     gameData.stats.energy = Math.min(100, baseStats - 5);
     gameData.stats.focus = Math.min(100, baseStats - 10);
     
-    // Вычисляем множитель опыта на основе рутины
+    // Вычисляем множители XP
+    let healthMultiplier = 1.0;
+    let routineMultiplier = 1.0;
+    
+    // Множитель от характеристик (здоровья)
+    if (gameData.stats.energy >= 80) healthMultiplier += 0.5;  // +50%
+    else if (gameData.stats.energy >= 60) healthMultiplier += 0.3;  // +30%
+    else if (gameData.stats.energy >= 40) healthMultiplier += 0.1;  // +10%
+    
+    if (gameData.stats.focus >= 70) healthMultiplier += 0.3;   // +30%
+    else if (gameData.stats.focus >= 50) healthMultiplier += 0.2;   // +20%
+    
+    if (gameData.stats.health >= 90) healthMultiplier += 0.2;  // +20%
+    else if (gameData.stats.health >= 70) healthMultiplier += 0.1;  // +10%
+    
+    // Множитель от рутины
     const routineCompletion = calculateRoutineCompletion();
-    let multiplier = 1.0;
+    if (routineCompletion >= 80) routineMultiplier = 1.3;      // +30%
+    else if (routineCompletion >= 60) routineMultiplier = 1.2; // +20%
+    else if (routineCompletion >= 40) routineMultiplier = 1.1; // +10%
+    else if (routineCompletion >= 20) routineMultiplier = 1.05; // +5%
     
-    if (routineCompletion >= 50) {
-        multiplier = 1.3; // +30% опыта за выполнение рутины
-    }
+    // Общий множитель
+    const totalMultiplier = healthMultiplier * routineMultiplier;
     
-    document.getElementById('multiplier-display').textContent = `Множитель опыта: ×${multiplier.toFixed(1)}`;
+    document.getElementById('multiplier-display').innerHTML = `
+        <div>Множитель опыта: ×${totalMultiplier.toFixed(1)}</div>
+        <div style="font-size: 0.8em; margin-top: 5px;">
+            💪 Здоровье: ×${healthMultiplier.toFixed(1)} | 📋 Рутина: ×${routineMultiplier.toFixed(1)}
+        </div>
+    `;
+    
     updateStats();
 }
 
@@ -895,3 +960,88 @@ window.onclick = function(event) {
         closeAddQuestModal();
     }
 }
+// Дать XP за рутину
+function giveRoutineXP(taskKey) {
+    let baseXP = 2;
+    let category = 'self';
+    
+    if (taskKey.includes('nesuda')) {
+        category = 'management';
+        baseXP = 3;
+    } else if (taskKey === 'family') {
+        category = 'family';
+    }
+    
+    let healthMultiplier = 1.0;
+    if (gameData.stats.energy >= 80) healthMultiplier += 0.5;
+    else if (gameData.stats.energy >= 60) healthMultiplier += 0.3;
+    
+    const finalXP = Math.round(baseXP * healthMultiplier);
+    addExperience(category, finalXP);
+    showMiniNotification(`+${finalXP} XP за "${gameData.routine[taskKey].text}"`);
+}
+
+// Мини-уведомления
+function showMiniNotification(message) {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed; top: 20px; right: 20px;
+        background: rgba(212, 175, 55, 0.9); color: #1a0f0a;
+        padding: 10px 15px; border-radius: 8px;
+        font-size: 0.9em; font-weight: bold; z-index: 1500;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        document.body.removeChild(notification);
+    }, 2000);
+}
+// Система наград за уровни
+const rewards = {
+    2: { type: 'title', name: 'Ученик Целителя', description: 'Первые шаги к мастерству' },
+    3: { type: 'equipment', name: 'Мантия Мудрости', description: '+10% XP ко всем действиям', bonus: 0.1 },
+    5: { type: 'title', name: 'Хранитель Знаний', description: 'Накопитель мудрости веков' },
+    7: { type: 'equipment', name: 'Кольцо Фокуса', description: '+15% к множителям', bonus: 0.15 },
+    10: { type: 'title', name: 'Мастер Баланса', description: 'Гармония тела и разума' },
+    15: { type: 'ability', name: 'Цепная Реакция', description: '+50% XP за связанные квесты', bonus: 0.5 },
+    20: { type: 'title', name: 'Легенда Мотивации', description: 'Вдохновение для других' }
+};
+
+// Проверка и выдача наград
+function checkLevelRewards() {
+    const currentLevel = gameData.experience.level;
+    
+    if (rewards[currentLevel] && !gameData.unlockedRewards) {
+        gameData.unlockedRewards = [];
+    }
+    
+    if (rewards[currentLevel] && !gameData.unloc
+// Проверка наград
+function checkLevelRewards(level) {
+    const reward = rewards[level];
+    if (reward) {
+        setTimeout(() => {
+            showRewardNotification(reward);
+        }, 1000);
+    }
+}
+
+// Показать награду
+function showRewardNotification(reward) {
+    const icons = { title: '👑', equipment: '⚔️', ability: '✨' };
+    const message = `${icons[reward.type]} Получена награда!\n\n"${reward.name}"\n${reward.description}`;
+    
+    alert(message);
+}
+
+// Награды
+const rewards = {
+    2: { type: 'title', name: 'Ученик Целителя', description: 'Первые шаги к мастерству' },
+    3: { type: 'equipment', name: 'Мантия Мудрости', description: '+10% XP ко всем действиям' },
+    5: { type: 'title', name: 'Хранитель Знаний', description: 'Накопитель мудрости веков' },
+    7: { type: 'equipment', name: 'Кольцо Фокуса', description: '+15% к множителям' },
+    10: { type: 'title', name: 'Мастер Баланса', description: 'Гармония тела и разума' },
+    15: { type: 'ability', name: 'Цепная Реакция', description: '+50% XP за связанные квесты' },
+    20: { type: 'title', name: 'Легенда Мотивации', description: 'Вдохновение для других' }
+};
