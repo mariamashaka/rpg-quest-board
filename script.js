@@ -459,3 +459,439 @@ if (gameData.quests.length === 0) {
     ];
     gameData.questIdCounter = 4;
 }
+// Работа с квестами
+function renderQuests() {
+    const grid = document.getElementById('quest-grid');
+    grid.innerHTML = '';
+    
+    gameData.quests.forEach(quest => {
+        const card = createQuestCard(quest);
+        grid.appendChild(card);
+    });
+    
+    if (gameData.quests.length === 0) {
+        grid.innerHTML = '<p style="text-align: center; color: #cdaa3d; grid-column: 1/-1;">Пока нет активных квестов. Создайте первый!</p>';
+    }
+}
+
+function createQuestCard(quest) {
+    const card = document.createElement('div');
+    card.className = 'quest-card';
+    card.dataset.category = quest.category;
+    
+    const progressPercent = Math.round(quest.progress);
+    const categoryName = categories[quest.category] || quest.category;
+    
+    // Дедлайн
+    let deadlineHtml = '';
+    if (quest.deadline) {
+        const deadlineText = formatDate(quest.deadline);
+        const overdue = isOverdue(quest.deadline);
+        deadlineHtml = `<div class="quest-deadline ${overdue ? 'overdue' : ''}">${deadlineText}</div>`;
+    }
+    
+    // Прогресс или этапы
+    let progressHtml = '';
+    if (quest.progressType === 'stages' && quest.stages && quest.stages.length > 0) {
+        // Показываем этапы
+        const stagesHtml = quest.stages.map((stage, index) => `
+            <div class="stage-item ${stage.done ? 'completed' : ''}">
+                <span class="stage-name">${stage.name}</span>
+                <span class="stage-percent">${stage.percent}%</span>
+                <input type="checkbox" class="stage-checkbox" 
+                       ${stage.done ? 'checked' : ''} 
+                       onchange="toggleStage(${quest.id}, ${index})">
+            </div>
+        `).join('');
+        
+        progressHtml = `
+            <div class="quest-stages">
+                ${stagesHtml}
+            </div>
+        `;
+    } else if (quest.progressType === 'steps') {
+        // Показываем прогресс по шагам
+        const current = quest.stepsCurrent || quest.stepsFrom;
+        const total = quest.stepsTo;
+        const unit = quest.stepsUnit || '';
+        
+        progressHtml = `
+            <div class="quest-progress">
+                <div style="margin-bottom: 8px; font-size: 0.9em; color: #cdaa3d;">
+                    ${current} / ${total} ${unit}
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                    <div class="progress-text">${progressPercent}%</div>
+                </div>
+            </div>
+        `;
+    } else {
+        // Обычный прогресс
+        progressHtml = `
+            <div class="quest-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                    <div class="progress-text">${progressPercent}%</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Кнопки управления
+    let controlsHtml = '';
+    if (quest.progressType === 'stages') {
+        controlsHtml = `
+            <div class="quest-controls">
+                <button class="btn btn-small" onclick="completeQuest(${quest.id})">✅ Завершить</button>
+                <button class="btn btn-small" onclick="deleteQuest(${quest.id})" style="background: #c44;">🗑️ Удалить</button>
+            </div>
+        `;
+    } else if (quest.progressType === 'steps') {
+        controlsHtml = `
+            <div class="quest-controls">
+                <button class="btn btn-small" onclick="updateStepsProgress(${quest.id}, 1)">+1 ${quest.stepsUnit || 'шаг'}</button>
+                <button class="btn btn-small" onclick="updateStepsProgress(${quest.id}, 5)">+5</button>
+                <button class="btn btn-small" onclick="completeQuest(${quest.id})">✅</button>
+                <button class="btn btn-small" onclick="deleteQuest(${quest.id})" style="background: #c44;">🗑️</button>
+            </div>
+        `;
+    } else {
+        controlsHtml = `
+            <div class="quest-controls">
+                <button class="btn btn-small" onclick="updateQuestProgress(${quest.id}, 10)">+10%</button>
+                <button class="btn btn-small" onclick="updateQuestProgress(${quest.id}, 25)">+25%</button>
+                <button class="btn btn-small" onclick="completeQuest(${quest.id})">✅</button>
+                <button class="btn btn-small" onclick="deleteQuest(${quest.id})" style="background: #c44;">🗑️</button>
+            </div>
+        `;
+    }
+    
+    card.innerHTML = `
+        <div class="quest-level level-${quest.level}">${quest.level}</div>
+        <div class="quest-title">${quest.title}</div>
+        <div class="quest-category">${categoryName}</div>
+        ${deadlineHtml}
+        ${quest.description ? `<p style="color: #cdaa3d; font-size: 0.9em; margin-bottom: 15px;">${quest.description}</p>` : ''}
+        ${progressHtml}
+        ${controlsHtml}
+    `;
+    
+    return card;
+}
+
+// Переключение этапа
+function toggleStage(questId, stageIndex) {
+    const quest = gameData.quests.find(q => q.id === questId);
+    if (quest && quest.stages && quest.stages[stageIndex]) {
+        quest.stages[stageIndex].done = !quest.stages[stageIndex].done;
+        
+        // Пересчитываем общий прогресс
+        let totalProgress = 0;
+        quest.stages.forEach(stage => {
+            if (stage.done) {
+                totalProgress += stage.percent;
+            }
+        });
+        quest.progress = totalProgress;
+        
+        // Если все этапы выполнены - завершаем квест
+        if (quest.progress >= 100) {
+            completeQuest(questId);
+        } else {
+            renderQuests();
+            saveGameData();
+        }
+    }
+}
+
+// Обновление прогресса по шагам
+function updateStepsProgress(questId, increment) {
+    const quest = gameData.quests.find(q => q.id === questId);
+    if (quest) {
+        const current = quest.stepsCurrent || quest.stepsFrom;
+        const newCurrent = Math.min(quest.stepsTo, current + increment);
+        quest.stepsCurrent = newCurrent;
+        
+        // Пересчитываем процент
+        const totalSteps = quest.stepsTo - quest.stepsFrom;
+        const completedSteps = newCurrent - quest.stepsFrom;
+        quest.progress = Math.round((completedSteps / totalSteps) * 100);
+        
+        // Применяем множители
+        const routineCompletion = calculateRoutineCompletion();
+        if (routineCompletion >= 50) {
+            // Небольшой бонус XP за каждый шаг при выполненной рутине
+            const stepXP = Math.round(calculateQuestXP(quest.level, 2)); // 2% от квеста за шаг
+            addExperience(quest.category, stepXP);
+        }
+        
+        if (quest.progress >= 100) {
+            completeQuest(questId);
+        } else {
+            renderQuests();
+            saveGameData();
+        }
+    }
+}
+
+function updateQuestProgress(questId, increment) {
+    const quest = gameData.quests.find(q => q.id === questId);
+    if (quest) {
+        const routineCompletion = calculateRoutineCompletion();
+        let actualIncrement = increment;
+        
+        // Применяем множители
+        if (routineCompletion >= 50) {
+            actualIncrement *= 1.3; // +30% за рутину
+        }
+        
+        quest.progress = Math.min(100, quest.progress + actualIncrement);
+        
+        if (quest.progress >= 100) {
+            completeQuest(questId);
+        } else {
+            renderQuests();
+            saveGameData();
+        }
+    }
+}
+
+function completeQuest(questId) {
+    const questIndex = gameData.quests.findIndex(q => q.id === questId);
+    if (questIndex !== -1) {
+        const quest = gameData.quests[questIndex];
+        
+        // Вычисляем и начисляем опыт
+        let baseXP = calculateQuestXP(quest.level, 100);
+        const routineCompletion = calculateRoutineCompletion();
+        
+        if (routineCompletion >= 50) {
+            baseXP = Math.round(baseXP * 1.3); // Применяем множитель
+        }
+        
+        // Штраф за просрочку
+        if (quest.deadline && isOverdue(quest.deadline)) {
+            baseXP = Math.round(baseXP * 0.8); // -20% за просрочку
+        }
+        
+        addExperience(quest.category, baseXP);
+        
+        // Показываем уведомление о завершении
+        const penalty = quest.deadline && isOverdue(quest.deadline) ? ' (-20% за просрочку)' : '';
+        alert(`🎉 Квест "${quest.title}" завершен!\n+${baseXP} XP в категории "${categories[quest.category]}"${penalty}`);
+        
+        gameData.quests.splice(questIndex, 1);
+        renderQuests();
+        saveGameData();
+    }
+}
+
+function deleteQuest(questId) {
+    if (confirm('❌ Удалить этот квест?\n\nВы потеряете весь прогресс!')) {
+        const questIndex = gameData.quests.findIndex(q => q.id === questId);
+        if (questIndex !== -1) {
+            gameData.quests.splice(questIndex, 1);
+            renderQuests();
+            saveGameData();
+        }
+    }
+}
+
+// Фильтрация квестов
+function filterQuests(category) {
+    // Обновляем активную кнопку
+    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Показываем/скрываем карточки
+    document.querySelectorAll('.quest-card').forEach(card => {
+        if (category === 'all' || card.dataset.category === category) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+// Модальное окно
+function showAddQuestModal() {
+    document.getElementById('addQuestModal').style.display = 'block';
+}
+
+function closeAddQuestModal() {
+    document.getElementById('addQuestModal').style.display = 'none';
+    // Очищаем форму
+    document.getElementById('quest-title').value = '';
+    document.getElementById('quest-description').value = '';
+    document.getElementById('progress-type').value = 'simple';
+    document.getElementById('steps-from').value = '';
+    document.getElementById('steps-to').value = '';
+    document.getElementById('steps-unit').value = '';
+    document.getElementById('quest-deadline').value = '';
+    document.getElementById('initial-progress').value = '0';
+    
+    // Скрываем опции
+    document.getElementById('steps-options').style.display = 'none';
+    document.getElementById('stages-options').style.display = 'none';
+    
+    // Очищаем этапы
+    const stagesList = document.getElementById('stages-list');
+    stagesList.innerHTML = `
+        <div class="stage-item" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+            <input type="text" placeholder="Название этапа..." style="flex: 1; padding: 8px; border: 1px solid #d4af37; border-radius: 5px; background: rgba(0,0,0,0.3); color: #d4af37;">
+            <input type="number" placeholder="%" min="1" max="100" style="width: 60px; padding: 8px; border: 1px solid #d4af37; border-radius: 5px; background: rgba(0,0,0,0.3); color: #d4af37;">
+            <button type="button" onclick="removeStage(this)" style="background: #c44; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer;">×</button>
+        </div>
+    `;
+}
+
+function addQuest() {
+    const title = document.getElementById('quest-title').value.trim();
+    const category = document.getElementById('quest-category').value;
+    const level = document.getElementById('quest-level').value;
+    const description = document.getElementById('quest-description').value.trim();
+    const progressType = document.getElementById('progress-type').value;
+    const deadline = document.getElementById('quest-deadline').value;
+    const initialProgress = parseInt(document.getElementById('initial-progress').value) || 0;
+    
+    if (!title) {
+        alert('Введите название квеста!');
+        return;
+    }
+    
+    const newQuest = {
+        id: gameData.questIdCounter++,
+        title: title,
+        category: category,
+        level: level,
+        description: description,
+        progress: initialProgress,
+        progressType: progressType,
+        deadline: deadline || null,
+        stages: [],
+        createdAt: new Date().toISOString()
+    };
+    
+    // Добавляем специфичные поля в зависимости от типа прогресса
+    if (progressType === 'steps') {
+        const stepsFrom = parseInt(document.getElementById('steps-from').value) || 0;
+        const stepsTo = parseInt(document.getElementById('steps-to').value) || 100;
+        const stepsUnit = document.getElementById('steps-unit').value.trim() || 'шаг';
+        
+        newQuest.stepsFrom = stepsFrom;
+        newQuest.stepsTo = stepsTo;
+        newQuest.stepsUnit = stepsUnit;
+        newQuest.stepsCurrent = stepsFrom + Math.round((stepsTo - stepsFrom) * initialProgress / 100);
+    } else if (progressType === 'stages') {
+        const stageInputs = document.querySelectorAll('#stages-list .stage-item');
+        const stages = [];
+        
+        stageInputs.forEach(stageItem => {
+            const nameInput = stageItem.querySelector('input[type="text"]');
+            const percentInput = stageItem.querySelector('input[type="number"]');
+            
+            if (nameInput.value.trim() && percentInput.value) {
+                stages.push({
+                    name: nameInput.value.trim(),
+                    percent: parseInt(percentInput.value),
+                    done: false
+                });
+            }
+        });
+        
+        newQuest.stages = stages;
+        newQuest.progress = 0; // Для этапов прогресс считается автоматически
+    }
+    
+    gameData.quests.push(newQuest);
+    renderQuests();
+    saveGameData();
+    closeAddQuestModal();
+}
+
+// Генератор квестов
+function generateQuest() {
+    const situation = document.getElementById('situation-input').value.trim();
+    
+    if (!situation) {
+        alert('Опишите ситуацию для создания квеста!');
+        return;
+    }
+    
+    // Простая логика генерации квестов на основе ключевых слов
+    let questData = analyzeситuation(situation);
+    
+    // Заполняем форму
+    document.getElementById('quest-title').value = questData.title;
+    document.getElementById('quest-category').value = questData.category;
+    document.getElementById('quest-level').value = questData.level;
+    document.getElementById('quest-description').value = questData.description;
+    
+    // Показываем модальное окно
+    showAddQuestModal();
+    
+    // Очищаем поле ввода
+    document.getElementById('situation-input').value = '';
+}
+
+function analyzeситuation(text) {
+    text = text.toLowerCase();
+    
+    let category = 'self';
+    let level = 'C';
+    let title = 'Новое задание';
+    let description = 'Автоматически созданный квест';
+    
+    // Определяем категорию
+    if (text.includes('дцп') || text.includes('эрготерапи') || text.includes('пациент') || text.includes('диагност') || text.includes('лечен') || text.includes('медиц')) {
+        category = 'medical';
+    } else if (text.includes('исследован') || text.includes('пыльц') || text.includes('ловушк') || text.includes('анализ') || text.includes('наук')) {
+        category = 'science';
+    } else if (text.includes('испанск') || text.includes('английск') || text.includes('язык') || text.includes('ielts') || text.includes('duolingo')) {
+        category = 'languages';
+    } else if (text.includes('клиник') || text.includes('управлен') || text.includes('команд') || text.includes('процесс') || text.includes('организац')) {
+        category = 'management';
+    } else if (text.includes('семь') || text.includes('дом') || text.includes('ребен') || text.includes('родител')) {
+        category = 'family';
+    }
+    
+    // Определяем уровень сложности
+    if (text.includes('начал') || text.includes('попробова') || text.includes('изуча')) {
+        level = 'D';
+        if (text.includes('эрготерапи')) {
+            title = 'Освоение основ эрготерапии';
+            description = 'Изучить базовые принципы эрготерапии для работы с детьми с ДЦП';
+        } else if (text.includes('испанск')) {
+            title = 'Изучение испанского языка';
+            description = 'Ежедневные занятия испанским языком';
+        }
+    } else if (text.includes('провест') || text.includes('сделат') || text.includes('реализова')) {
+        level = 'C';
+        if (text.includes('ловушк')) {
+            title = 'Создание пыльцевой ловушки';
+            description = 'Разработать и протестировать пыльцевую ловушку для исследований';
+        }
+    } else if (text.includes('внедрит') || text.includes('системно') || text.includes('комплексно')) {
+        level = 'B';
+    } else if (text.includes('революцион') || text.includes('кардинально') || text.includes('полност')) {
+        level = 'A';
+    }
+    
+    // Если не смогли определить конкретное название
+    if (title === 'Новое задание') {
+        const words = text.split(' ').slice(0, 4).join(' ');
+        title = words.charAt(0).toUpperCase() + words.slice(1);
+        description = `Квест создан на основе: "${text.slice(0, 100)}..."`;
+    }
+    
+    return { title, category, level, description };
+}
+
+// Закрытие модального окна по клику вне его
+window.onclick = function(event) {
+    const modal = document.getElementById('addQuestModal');
+    if (event.target === modal) {
+        closeAddQuestModal();
+    }
+}
