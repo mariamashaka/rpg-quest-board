@@ -495,3 +495,299 @@ function isOverdue(dateString) {
     const now = new Date();
     return date.getTime() < now.getTime();
 }
+/ Работа с квестами
+function renderQuests() {
+    const grid = document.getElementById('quest-grid');
+    grid.innerHTML = '';
+    
+    gameData.quests.forEach(quest => {
+        const card = createQuestCard(quest);
+        grid.appendChild(card);
+    });
+    
+    if (gameData.quests.length === 0) {
+        grid.innerHTML = '<p style="text-align: center; color: #cdaa3d; grid-column: 1/-1;">Пока нет активных квестов. Создайте первый!</p>';
+    }
+}
+
+function createQuestCard(quest) {
+    const card = document.createElement('div');
+    card.className = 'quest-card';
+    card.dataset.category = quest.category;
+    
+    const progressPercent = Math.round(quest.progress);
+    const categoryName = categories[quest.category] || quest.category;
+    
+    let deadlineHtml = '';
+    if (quest.deadline) {
+        const deadlineText = formatDate(quest.deadline);
+        const overdue = isOverdue(quest.deadline);
+        deadlineHtml = `<div class="quest-deadline ${overdue ? 'overdue' : ''}">${deadlineText}</div>`;
+    }
+    
+    let progressHtml = `
+        <div class="quest-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                <div class="progress-text">${progressPercent}%</div>
+            </div>
+        </div>
+    `;
+    
+    let controlsHtml = `
+        <div class="quest-controls">
+            <button class="btn btn-small" onclick="updateQuestProgress(${quest.id}, 10)">+10%</button>
+            <button class="btn btn-small" onclick="updateQuestProgress(${quest.id}, 25)">+25%</button>
+            <button class="btn btn-small" onclick="completeQuest(${quest.id})">✅</button>
+            <button class="btn btn-small" onclick="deleteQuest(${quest.id})" style="background: #c44;">🗑️</button>
+        </div>
+    `;
+    
+    card.innerHTML = `
+        <div class="quest-level level-${quest.level}">${quest.level}</div>
+        <div class="quest-title">${quest.title}</div>
+        <div class="quest-category">${categoryName}</div>
+        ${deadlineHtml}
+        ${quest.description ? `<p style="color: #cdaa3d; font-size: 0.9em; margin-bottom: 15px;">${quest.description}</p>` : ''}
+        ${progressHtml}
+        ${controlsHtml}
+    `;
+    
+    return card;
+}
+
+function updateQuestProgress(questId, increment) {
+    const quest = gameData.quests.find(q => q.id === questId);
+    if (quest) {
+        const routineCompletion = calculateRoutineCompletion();
+        let actualIncrement = increment;
+        
+        if (routineCompletion >= 50) {
+            actualIncrement *= 1.3;
+        }
+        
+        quest.progress = Math.min(100, quest.progress + actualIncrement);
+        
+        if (quest.progress >= 100) {
+            completeQuest(questId);
+        } else {
+            renderQuests();
+            saveGameData();
+        }
+    }
+}
+
+function completeQuest(questId) {
+    const questIndex = gameData.quests.findIndex(q => q.id === questId);
+    if (questIndex !== -1) {
+        const quest = gameData.quests[questIndex];
+        
+        let baseXP = calculateQuestXP(quest.level, 100);
+        const routineCompletion = calculateRoutineCompletion();
+        
+        if (routineCompletion >= 50) {
+            baseXP = Math.round(baseXP * 1.3);
+        }
+        
+        if (quest.deadline && isOverdue(quest.deadline)) {
+            baseXP = Math.round(baseXP * 0.8);
+        }
+        
+        addExperience(quest.category, baseXP);
+        
+        const penalty = quest.deadline && isOverdue(quest.deadline) ? ' (-20% за просрочку)' : '';
+        alert(`🎉 Квест "${quest.title}" завершен!\n+${baseXP} XP в категории "${categories[quest.category]}"${penalty}`);
+        
+        gameData.quests.splice(questIndex, 1);
+        renderQuests();
+        saveGameData();
+    }
+}
+
+function deleteQuest(questId) {
+    if (confirm('❌ Удалить этот квест?\n\nВы потеряете весь прогресс!')) {
+        const questIndex = gameData.quests.findIndex(q => q.id === questId);
+        if (questIndex !== -1) {
+            gameData.quests.splice(questIndex, 1);
+            renderQuests();
+            saveGameData();
+        }
+    }
+}
+
+function filterQuests(category) {
+    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    document.querySelectorAll('.quest-card').forEach(card => {
+        if (category === 'all' || card.dataset.category === category) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+function showAddQuestModal() {
+    document.getElementById('addQuestModal').style.display = 'block';
+}
+
+function closeAddQuestModal() {
+    document.getElementById('addQuestModal').style.display = 'none';
+    document.getElementById('quest-title').value = '';
+    document.getElementById('quest-description').value = '';
+    document.getElementById('progress-type').value = 'simple';
+    document.getElementById('quest-deadline').value = '';
+    document.getElementById('initial-progress').value = '0';
+    
+    document.getElementById('steps-options').style.display = 'none';
+    document.getElementById('stages-options').style.display = 'none';
+}
+
+function addQuest() {
+    const title = document.getElementById('quest-title').value.trim();
+    const category = document.getElementById('quest-category').value;
+    const level = document.getElementById('quest-level').value;
+    const description = document.getElementById('quest-description').value.trim();
+    const deadline = document.getElementById('quest-deadline').value;
+    const initialProgress = parseInt(document.getElementById('initial-progress').value) || 0;
+    
+    if (!title) {
+        alert('Введите название квеста!');
+        return;
+    }
+    
+    const newQuest = {
+        id: gameData.questIdCounter++,
+        title: title,
+        category: category,
+        level: level,
+        description: description,
+        progress: initialProgress,
+        deadline: deadline || null,
+        createdAt: new Date().toISOString()
+    };
+    
+    gameData.quests.push(newQuest);
+    renderQuests();
+    saveGameData();
+    closeAddQuestModal();
+}
+
+function generateQuest() {
+    const situation = document.getElementById('situation-input').value.trim();
+    
+    if (!situation) {
+        alert('Опишите ситуацию для создания квеста!');
+        return;
+    }
+    
+    let questData = analyzeситuation(situation);
+    
+    document.getElementById('quest-title').value = questData.title;
+    document.getElementById('quest-category').value = questData.category;
+    document.getElementById('quest-level').value = questData.level;
+    document.getElementById('quest-description').value = questData.description;
+    
+    showAddQuestModal();
+    document.getElementById('situation-input').value = '';
+}
+
+function analyzeситuation(text) {
+    text = text.toLowerCase();
+    
+    let category = 'self';
+    let level = 'C';
+    let title = 'Новое задание';
+    let description = 'Автоматически созданный квест';
+    
+    if (text.includes('дцп') || text.includes('эрготерапи') || text.includes('пациент') || text.includes('медиц')) {
+        category = 'medical';
+    } else if (text.includes('исследован') || text.includes('пыльц') || text.includes('ловушк') || text.includes('наук')) {
+        category = 'science';
+    } else if (text.includes('испанск') || text.includes('английск') || text.includes('язык') || text.includes('ielts')) {
+        category = 'languages';
+    } else if (text.includes('клиник') || text.includes('управлен') || text.includes('команд')) {
+        category = 'management';
+    } else if (text.includes('семь') || text.includes('дом') || text.includes('ребен')) {
+        category = 'family';
+    }
+    
+    if (text.includes('начал') || text.includes('попробова') || text.includes('изуча')) {
+        level = 'D';
+    } else if (text.includes('провест') || text.includes('сделат')) {
+        level = 'C';
+    } else if (text.includes('внедрит') || text.includes('системно')) {
+        level = 'B';
+    }
+    
+    if (title === 'Новое задание') {
+        const words = text.split(' ').slice(0, 4).join(' ');
+        title = words.charAt(0).toUpperCase() + words.slice(1);
+        description = `Квест создан на основе: "${text.slice(0, 100)}..."`;
+    }
+    
+    return { title, category, level, description };
+}
+
+window.onclick = function(event) {
+    const modal = document.getElementById('addQuestModal');
+    if (event.target === modal) {
+        closeAddQuestModal();
+    }
+}
+
+// Система наград
+function checkLevelRewards(level) {
+    const rewards = {
+        2: { type: 'title', name: 'Ученик Целителя', description: 'Первые шаги к мастерству' },
+        3: { type: 'equipment', name: 'Мантия Мудрости', description: '+10% XP ко всем действиям' },
+        5: { type: 'title', name: 'Хранитель Знаний', description: 'Накопитель мудрости веков' },
+        10: { type: 'title', name: 'Мастер Баланса', description: 'Гармония тела и разума' }
+    };
+    
+    const reward = rewards[level];
+    if (reward) {
+        setTimeout(() => {
+            const icons = { title: '👑', equipment: '⚔️', ability: '✨' };
+            const message = `${icons[reward.type]} Получена награда!\n\n"${reward.name}"\n${reward.description}`;
+            alert(message);
+        }, 1000);
+    }
+}
+
+// Добавляем стартовые квесты
+if (gameData.quests.length === 0) {
+    gameData.quests = [
+        {
+            id: 1,
+            title: 'Изучение испанского языка',
+            category: 'languages',
+            level: 'C',
+            description: 'Достичь уровня B1 в испанском языке',
+            progress: 30,
+            deadline: '2026-06-01',
+            createdAt: new Date().toISOString()
+        },
+        {
+            id: 2,
+            title: 'Создание пыльцевой ловушки',
+            category: 'science',
+            level: 'B',
+            description: 'Разработать прототип для сбора данных о пыльце',
+            progress: 15,
+            deadline: '2025-09-01',
+            createdAt: new Date().toISOString()
+        },
+        {
+            id: 3,
+            title: 'Освоение эрготерапии',
+            category: 'medical',
+            level: 'C',
+            description: 'Изучить методики работы с детьми с ДЦП',
+            progress: 0,
+            createdAt: new Date().toISOString()
+        }
+    ];
+    gameData.questIdCounter = 4;
+}
